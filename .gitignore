@@ -1,0 +1,15 @@
+.pio/
+.pio-build/
+.vscode/
+*.o
+*.d
+*.elf
+*.bin
+*.map
+*.a
+*.pyc
+__pycache__/
+*.swp
+*.swo
+*~
+.DS_Store
