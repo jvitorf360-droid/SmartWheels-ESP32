@@ -6,7 +6,7 @@
 
 // ========== PINAGEM ==========
 #define BOTAO_PANICO_PIN    15
-#define BOTAO_AMARELO_PIN   13   // Para implementação futura
+#define BOTAO_AMARELO_PIN   18
 #define GPS_RX_PIN          16
 #define GPS_TX_PIN          17
 #define GPS_BAUD            9600
