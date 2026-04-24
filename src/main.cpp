@@ -32,7 +32,11 @@ void enviarDadosPeriodicos();
 void setup() {
     // Inicializa serial para debug
     Serial.begin(115200);
+    esp_task_wdt_init(10, true);
+    esp_task_wdt_add(NULL);
     delay(1000);
+
+     
     
     Serial.println("\n\n========================================");
     Serial.println("   SMARTWHEELS - SISTEMA DE ALERTA");
