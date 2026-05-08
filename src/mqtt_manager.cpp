@@ -39,7 +39,7 @@ static void callbackMensagem(char* topic, byte* payload, unsigned int length) {
     // Processa comandos recebidos (para implementação futura)
     if (String(topic).indexOf("rpc") > 0) {
         // Comando RPC do ThingsBoard
-        JsonDocument doc;
+        DynamicJsonDocument doc(1024);;
         DeserializationError error = deserializeJson(doc, mensagem);
         
         if (!error) {

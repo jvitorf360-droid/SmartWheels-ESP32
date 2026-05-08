@@ -5,9 +5,14 @@
 #define WIFI_MANAGER_H
 
 #include <Arduino.h>
-#include <WiFi.h>
+#define TINY_GSM_MODEM_SIM7600
+
+#include <TinyGsmClient.h>
 #include "config.h"
 #include "storage_manager.h"
+
+extern HardwareSerial SerialAT;
+extern TinyGsm modem;
 
 // ========== ESTRUTURA PARA STATUS DO WiFi ==========
 struct WiFiStatus {

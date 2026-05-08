@@ -1,8 +1,12 @@
 // wifi_manager.cpp
 // Implementação do gerenciamento da conexão WiFi
+const char apn[] = "zap.vivo.com.br";
 
 #include "wifi_manager.h"
 #include "logger.h"
+
+HardwareSerial SerialAT(1);
+TinyGsm modem(SerialAT);
 
 // ========== DEFINIÇÃO DAS VARIÁVEIS GLOBAIS ==========
 bool emModoAP = false;
@@ -16,8 +20,11 @@ static bool wifiConfigurado = false;
 
 void inicializarWiFi() {
     LOG_INFO("Inicializando WiFi...");
-    WiFi.mode(WIFI_STA);
-    WiFi.setAutoReconnect(false);  // Vamos gerenciar manualmente
+    SerialAT.begin(115200, SERIAL_8N1, 16, 17);
+
+    LOG_INFO("Inicializando modem LTE...");
+
+    modem.restart();  // Vamos gerenciar manualmente
     
     // Verifica se há credenciais salvas
     if (wifi_ssid != "") {
@@ -30,32 +37,25 @@ void inicializarWiFi() {
 }
 
 bool conectarWiFi(String ssid, String senha, int timeoutSegundos) {
-    LOG_INFO("Conectando ao WiFi: " + ssid);
-    
-    WiFi.begin(ssid.c_str(), senha.c_str());
-    
-    int tentativas = 0;
-    int maxTentativas = timeoutSegundos * 2;  // 2 tentativas por segundo
-    
-    while (WiFi.status() != WL_CONNECTED && tentativas < maxTentativas) {
-        delay(500);
-        Serial.print(".");
-        tentativas++;
-    }
-    Serial.println();
-    
-    if (WiFi.status() == WL_CONNECTED) {
-        LOG_INFO("✅ WiFi conectado com sucesso!");
-        LOG_INFO("  IP: " + WiFi.localIP().toString());
-        LOG_INFO("  RSSI: " + String(WiFi.RSSI()) + " dBm");
-        
+
+    LOG_INFO("Conectando LTE/4G...");
+
+    const char apn[] = "zap.vivo.com.br";
+
+    bool conectado = modem.gprsConnect(apn, "", "");
+
+    if (conectado) {
+
+        LOG_INFO("✅ LTE conectado!");
+
         emModoAP = false;
         tentativasReconexao = 0;
-        wifiConfigurado = true;
-        
+
         return true;
+
     } else {
-        LOG_ERROR("❌ Falha ao conectar ao WiFi: " + ssid);
+
+        LOG_ERROR("❌ Falha conexão LTE");
         return false;
     }
 }
@@ -72,24 +72,24 @@ bool conectarWiFiSalvo() {
 void iniciarModoAP() {
     LOG_INFO("Iniciando modo Access Point...");
     
-    WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASSWORD);
+    //WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASSWORD);
     emModoAP = true;
     
     LOG_INFO("📡 Modo AP Ativo");
     LOG_INFO("  SSID: " + String(WIFI_AP_SSID));
     LOG_INFO("  Senha: " + String(WIFI_AP_PASSWORD));
-    LOG_INFO("  IP: " + WiFi.softAPIP().toString());
+    LOG_INFO("Modo AP desativado no LTE");
 }
 
 void desconectarWiFi() {
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
+    //WiFi.disconnect(true);
+    //WiFi.mode(WIFI_OFF);
     LOG_INFO("WiFi desconectado e modo desligado");
 }
 
 void tentarReconexaoWiFi() {
     // Se já estiver conectado, não faz nada
-    if (WiFi.status() == WL_CONNECTED) {
+    if (modem.isGprsConnected()) {
         tentativasReconexao = 0;
         return;
     }
@@ -107,13 +107,13 @@ void tentarReconexaoWiFi() {
     
     delay(delayMs);
     
-    WiFi.reconnect();
+    modem.gprsConnect(apn, "", "");
     tentativasReconexao++;
     
     // Verifica se conseguiu
-    if (WiFi.status() == WL_CONNECTED) {
+    if (modem.isGprsConnected()) {
         LOG_INFO("✅ WiFi reconectado com sucesso!");
-        LOG_INFO("  IP: " + WiFi.localIP().toString());
+        LOG_INFO("  IP: " + modem.getLocalIP());
         tentativasReconexao = 0;
         
         // Sai do modo AP se estava nele
@@ -131,7 +131,7 @@ void verificarConexaoWiFi() {
     }
     
     // Se está conectado, resetar contador
-    if (WiFi.status() == WL_CONNECTED) {
+    if (modem.isGprsConnected()) {
         tentativasReconexao = 0;
         return;
     }
@@ -146,14 +146,14 @@ void verificarConexaoWiFi() {
 
 WiFiStatus obterStatusWiFi() {
     WiFiStatus status;
-    status.conectado = (WiFi.status() == WL_CONNECTED);
+    status.conectado = (modem.isGprsConnected());
     status.ssid = wifi_ssid;
-    status.rssi = WiFi.RSSI();
+    status.rssi = 0;
     
     if (status.conectado) {
-        status.ip = WiFi.localIP().toString();
+        status.ip = modem.getLocalIP();
     } else if (emModoAP) {
-        status.ip = WiFi.softAPIP().toString();
+        status.ip = modem.getLocalIP();
     } else {
         status.ip = "0.0.0.0";
     }
@@ -162,5 +162,5 @@ WiFiStatus obterStatusWiFi() {
 }
 
 String getMacAddress() {
-    return WiFi.macAddress();
+    return modem.getModemInfo();
 }
