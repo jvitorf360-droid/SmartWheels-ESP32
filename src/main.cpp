@@ -11,6 +11,8 @@
 #include "wifi_manager.h"
 #include "mqtt_manager.h"
 #include "web_server.h"
+#include <queue>
+
 
 // Variáveis de diagnóstico
 int contadorReinicios = 0;
@@ -89,7 +91,7 @@ if (alertaAcessibilidadeAtivo) {
     // 6. Inicializa WiFi
     inicializarWiFi();
     
-    // 7. Tenta conectar ao WiFi salvo
+        // 7. Tenta conectar ao WiFi salvo
     if (wifi_ssid != "") {
         LOG_INFO("Tentando conectar ao WiFi salvo...");
         if (conectarWiFiSalvo()) {
@@ -100,9 +102,9 @@ if (alertaAcessibilidadeAtivo) {
             conectarMQTT();
             
             // 8.1 Limpa a fila de mensagens antigas
-            while (!filaMensagens.empty()) {
-                filaMensagens.pop();
-            }
+            // while (!filaMensagens.empty()) {
+            //     filaMensagens.pop();
+            // }
             LOG_INFO("Fila de mensagens limpa");
             
         } else {
@@ -160,32 +162,10 @@ void loop() {
 
 // ========== FUNÇÃO PARA PROCESSAR EVENTOS DOS BOTÕES ==========
 void processarEventos() {
-    TipoEvento evento = verificarEvento();
-    
-    switch (evento) {
-        case EVENTO_PANICO:
-            LOG_INFO("🚨 Evento de PÂNICO detectado!");
-            {
-                Localizacao loc = obterLocalizacao(TIMEOUT_GPS_MS);
-                enviarAlertaPanico(loc);
-            }
-            break;
-            
-        case EVENTO_ACESSIBILIDADE:
-            LOG_INFO("⚠️ Evento de ACESSIBILIDADE detectado!");
-            {
-                Localizacao loc = obterLocalizacao(TIMEOUT_GPS_MS);
-                enviarAlertaAcessibilidade(loc);
-            }
-            break;
-            
-        case EVENTO_NENHUM:
-        default:
-            // Nada a fazer
-            break;
-    }
+    // Os eventos já são enviados diretamente no button_handler.cpp
+    // Não precisa enviar novamente aqui
+    return;
 }
-
 // ========== FUNÇÃO PARA ENVIAR DADOS PERIÓDICOS ==========
 void enviarDadosPeriodicos() {
     unsigned long agora = millis();
@@ -195,7 +175,7 @@ void enviarDadosPeriodicos() {
         ultimaTelemetria = agora;
         
         if (WiFi.status() == WL_CONNECTED && client.connected()) {
-            enviarTelemetria();
+//            enviarTelemetria();
         }
     }
     
@@ -204,7 +184,7 @@ void enviarDadosPeriodicos() {
         ultimoHeartbeat = agora;
         
         if (WiFi.status() == WL_CONNECTED && client.connected()) {
-            enviarHeartbeat();
+//            enviarHeartbeat();
         }
         
         // Log periódico de status (apenas em DEBUG)

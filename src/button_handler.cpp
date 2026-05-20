@@ -4,6 +4,7 @@
 #include "button_handler.h"
 #include "logger.h"
 #include "storage_manager.h"
+#include "mqtt_manager.h"
 
 // ========== DEFINIÇÃO DAS VARIÁVEIS GLOBAIS ==========
 bool alertaPanicoAtivo = false;
@@ -51,22 +52,26 @@ static void processarBotao(EstadoBotao &botao) {
         
         // Verifica se foi pressão longa (>= TEMPO_PANICO_MS)
         if (tempoPressionado >= (TEMPO_PANICO_MS / 1000)) {
-            // Alterna o estado do alerta
-            if (botao.tipo == EVENTO_PANICO) {
-                alertaPanicoAtivo = !alertaPanicoAtivo;
-                LOG_INFO(alertaPanicoAtivo ? "🚨 ALERTA DE PÂNICO ATIVADO!" : "✅ Alerta de pânico desativado");
-                
-                // Salva o estado na EEPROM
-                salvarEstadoPanico(alertaPanicoAtivo);
-                
-            } else if (botao.tipo == EVENTO_ACESSIBILIDADE) {
-                alertaAcessibilidadeAtivo = !alertaAcessibilidadeAtivo;
-                LOG_INFO(alertaAcessibilidadeAtivo ? "⚠️ ALERTA DE ACESSIBILIDADE ATIVADO!" : "✅ Alerta de acessibilidade desativado");
-                
-                // Salva o estado na EEPROM
-                salvarEstadoAcessibilidade(alertaAcessibilidadeAtivo);
-            }
-        }
+    // Alterna o estado do alerta
+    if (botao.tipo == EVENTO_PANICO) {
+        alertaPanicoAtivo = !alertaPanicoAtivo;
+        LOG_INFO(alertaPanicoAtivo ? "🚨 ALERTA DE PÂNICO ATIVADO!" : "✅ Alerta de pânico desativado");
+        
+        enviarAlertaPanico(alertaPanicoAtivo);
+        
+        // Salva o estado na EEPROM
+        salvarEstadoPanico(alertaPanicoAtivo);
+        
+    } else if (botao.tipo == EVENTO_ACESSIBILIDADE) {
+        alertaAcessibilidadeAtivo = !alertaAcessibilidadeAtivo;
+        LOG_INFO(alertaAcessibilidadeAtivo ? "⚠️ ALERTA DE ACESSIBILIDADE ATIVADO!" : "✅ Alerta de acessibilidade desativado");
+        
+        enviarAlertaAcessibilidade(alertaAcessibilidadeAtivo);
+        
+        // Salva o estado na EEPROM
+        salvarEstadoAcessibilidade(alertaAcessibilidadeAtivo);
+    }
+}
     }
 }
 

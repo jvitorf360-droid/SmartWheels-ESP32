@@ -61,6 +61,7 @@ Localizacao obterLocalizacao(int timeoutMs) {
     unsigned long inicio = millis();
     
     while (millis() - inicio < timeoutMs) {
+         esp_task_wdt_reset();
         // Processa dados GPS disponíveis
         while (GPS_SERIAL.available() > 0) {
             if (gps.encode(GPS_SERIAL.read())) {

@@ -12,8 +12,6 @@
 extern int contadorReinicios;
 extern int contadorFalhasMQTT;
 
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-
 // ========== DEFINIÇÃO DAS VARIÁVEIS GLOBAIS ==========
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -27,7 +25,6 @@ static unsigned long ultimaTentativaMQTT = 0;
 
 // ========== FUNÇÕES AUXILIARES INTERNAS ==========
 static void callbackMensagem(char* topic, byte* payload, unsigned int length) {
-    // Converte payload para string
     String mensagem;
     for (unsigned int i = 0; i < length; i++) {
         mensagem += (char)payload[i];
@@ -36,10 +33,8 @@ static void callbackMensagem(char* topic, byte* payload, unsigned int length) {
     LOG_INFO("Mensagem recebida no tópico: " + String(topic));
     LOG_DEBUG("  Payload: " + mensagem);
     
-    // Processa comandos recebidos (para implementação futura)
     if (String(topic).indexOf("rpc") > 0) {
-        // Comando RPC do ThingsBoard
-        JsonDocument doc;
+        DynamicJsonDocument doc(1024);
         DeserializationError error = deserializeJson(doc, mensagem);
         
         if (!error) {
@@ -59,8 +54,7 @@ static void callbackMensagem(char* topic, byte* payload, unsigned int length) {
                 String tipo = doc["params"]["tipo"] | "";
                 if (tipo == "panico") {
                     LOG_INFO("Comando de teste de pânico recebido");
-                    Localizacao loc = obterLocalizacao(3000);
-                    enviarAlertaPanico(loc);
+                    enviarAlertaPanico(true);
                 }
             }
         }
@@ -89,17 +83,13 @@ bool conectarMQTT() {
     
     LOG_INFO("Conectando ao broker MQTT...");
     
-    // Gera um clientId único baseado no MAC address
     String clientId = "ESP32_SmartWheels_" + getMacAddress();
     
     if (client.connect(clientId.c_str(), mqtt_token.c_str(), "")) {
         LOG_INFO("✅ Conectado ao ThingsBoard via MQTT!");
         tentativasReconexaoMQTT = 0;
-        
-        // Inscreve em tópicos para receber comandos
         client.subscribe("v1/devices/me/rpc/request/+");
         LOG_DEBUG("Inscrito em tópicos RPC");
-        
         return true;
     } else {
         LOG_ERROR("❌ Falha na conexão MQTT. Estado: " + String(client.state()));
@@ -116,7 +106,6 @@ void desconectarMQTT() {
 
 void loopMQTT() {
     if (!client.connected()) {
-        // Tenta reconectar a cada 10 segundos
         unsigned long agora = millis();
         if (agora - ultimaTentativaMQTT > 10000) {
             ultimaTentativaMQTT = agora;
@@ -133,7 +122,6 @@ void publicarMensagem(String topico, String payload) {
     if (client.connected()) {
         if (client.publish(topico.c_str(), payload.c_str())) {
             LOG_DEBUG("Mensagem publicada com sucesso no tópico: " + topico);
-            return;
         } else {
             LOG_ERROR("Falha ao publicar mensagem no tópico: " + topico);
         }
@@ -148,15 +136,12 @@ void publicarSeguro(String topico, String payload) {
             LOG_DEBUG("Mensagem publicada com sucesso");
             return;
         } else {
-            // LOG MAIS DETALHADO AQUI
             LOG_ERROR("Falha ao publicar no tópico: " + topico);
-            LOG_ERROR("Payload: " + payload.substring(0, 100)); // primeiros 100 caracteres
+            LOG_ERROR("Payload: " + payload.substring(0, 100));
         }
     }
     
-    // Se falhou ou está desconectado, enfileira
     filaMensagens.push({topico, payload, millis()});
-    
     if (filaMensagens.size() > 50) {
         filaMensagens.pop();
     }
@@ -168,26 +153,21 @@ void processarFilaMensagens() {
     }
     
     int enviadas = 0;
-    int falhas = 0;
     
     while (!filaMensagens.empty() && client.connected() && enviadas < 10) {
         MensagemPendente msg = filaMensagens.front();
-        
         if (client.publish(msg.topico.c_str(), msg.payload.c_str())) {
             filaMensagens.pop();
             enviadas++;
         } else {
-            falhas++;
-            break;  // Sai do loop se falhar
+            break;
         }
     }
     
-    // Só mostra log se conseguiu enviar algo
     if (enviadas > 0) {
         LOG_DEBUG("Processadas " + String(enviadas) + " mensagens da fila");
     }
     
-    // Só mostra erro se a fila estiver cheia (uma vez a cada 30 segundos)
     static unsigned long ultimoLogErro = 0;
     if (filaMensagens.size() > 0 && millis() - ultimoLogErro > 30000) {
         ultimoLogErro = millis();
@@ -195,32 +175,25 @@ void processarFilaMensagens() {
     }
 }
 
-void enviarAlertaPanico(Localizacao loc) {
-    LOG_INFO("Enviando ALERTA DE PÂNICO...");
+// ========== NOVAS FUNÇÕES (payload enxuto com estado) ==========
+
+void enviarAlertaPanico(bool ativo) {
+    LOG_INFO("Enviando ALERTA DE PÂNICO - Estado: " + String(ativo ? "ATIVO" : "DESATIVADO"));
     
-    // Validação da localização
+    Localizacao loc = obterLocalizacao(TIMEOUT_GPS_MS);
+    
     if (isnan(loc.latitude) || isnan(loc.longitude)) {
         LOG_ERROR("Localização inválida! Usando valores padrão");
         loc.latitude = SIM_LATITUDE_PADRAO;
         loc.longitude = SIM_LONGITUDE_PADRAO;
-        loc.precisao = 50;
-        loc.fonte = "SIM";
-        loc.satelites = 0;
     }
     
-    // JSON reduzido (nomes de campos curtos)
     String payload = "{";
-    payload += "\"e\":\"PAN\",";
-    payload += "\"v\":\"" + String(VERSAO_PAYLOAD) + "\",";
-    payload += "\"ts\":" + String(millis()) + ",";
-    payload += "\"id\":\"" + getMacAddress() + "\",";
-    payload += "\"lat\":" + String(loc.latitude, 6) + ",";
-    payload += "\"lng\":" + String(loc.longitude, 6) + ",";
-    payload += "\"prec\":" + String(loc.precisao) + ",";
-    payload += "\"src\":\"" + loc.fonte + "\",";
-    payload += "\"sat\":" + String(loc.satelites) + ",";
-    payload += "\"rssi\":" + String(WiFi.RSSI()) + ",";
-    payload += "\"bat\":85";
+    payload += "\"botao_acionado\":\"panico\",";
+    payload += "\"estado_acionamento\":" + String(ativo ? 1 : 0) + ",";
+    payload += "\"latitude\":" + String(loc.latitude, 6) + ",";
+    payload += "\"longitude\":" + String(loc.longitude, 6) + ",";
+    payload += "\"token\":\"" + mqtt_token + "\"";
     payload += "}";
     
     LOG_INFO("Payload: " + payload);
@@ -233,32 +206,23 @@ void enviarAlertaPanico(Localizacao loc) {
     }
 }
 
-void enviarAlertaAcessibilidade(Localizacao loc) {
-    LOG_INFO("Enviando ALERTA DE ACESSIBILIDADE...");
+void enviarAlertaAcessibilidade(bool ativo) {
+    LOG_INFO("Enviando ALERTA DE ACESSIBILIDADE - Estado: " + String(ativo ? "ATIVO" : "DESATIVADO"));
     
-    // Validação da localização
+    Localizacao loc = obterLocalizacao(TIMEOUT_GPS_MS);
+    
     if (isnan(loc.latitude) || isnan(loc.longitude)) {
         LOG_ERROR("Localização inválida! Usando valores padrão");
         loc.latitude = SIM_LATITUDE_PADRAO;
         loc.longitude = SIM_LONGITUDE_PADRAO;
-        loc.precisao = 50;
-        loc.fonte = "SIM";
-        loc.satelites = 0;
     }
     
-    // JSON reduzido (nomes de campos curtos)
     String payload = "{";
-    payload += "\"e\":\"ACC\",";
-    payload += "\"v\":\"" + String(VERSAO_PAYLOAD) + "\",";
-    payload += "\"ts\":" + String(millis()) + ",";
-    payload += "\"id\":\"" + getMacAddress() + "\",";
-    payload += "\"lat\":" + String(loc.latitude, 6) + ",";
-    payload += "\"lng\":" + String(loc.longitude, 6) + ",";
-    payload += "\"prec\":" + String(loc.precisao) + ",";
-    payload += "\"src\":\"" + loc.fonte + "\",";
-    payload += "\"sat\":" + String(loc.satelites) + ",";
-    payload += "\"rssi\":" + String(WiFi.RSSI()) + ",";
-    payload += "\"bat\":85";
+    payload += "\"botao_acionado\":\"acessibilidade\",";
+    payload += "\"estado_acionamento\":" + String(ativo ? 1 : 0) + ",";
+    payload += "\"latitude\":" + String(loc.latitude, 6) + ",";
+    payload += "\"longitude\":" + String(loc.longitude, 6) + ",";
+    payload += "\"token\":\"" + mqtt_token + "\"";
     payload += "}";
     
     LOG_INFO("Payload: " + payload);
@@ -273,11 +237,9 @@ void enviarAlertaAcessibilidade(Localizacao loc) {
 
 void enviarTelemetria() {
     if (!client.connected()) {
-        incrementarContadorFalhas();
         return;
     }
     
-    // JSON reduzido para telemetria com diagnóstico
     String payload = "{";
     payload += "\"e\":\"TEL\",";
     payload += "\"ts\":" + String(millis()) + ",";
@@ -293,15 +255,14 @@ void enviarTelemetria() {
         LOG_DEBUG("Telemetria enviada");
     } else {
         LOG_ERROR("Falha ao enviar telemetria");
-        incrementarContadorFalhas();
     }
 }
+
 void enviarHeartbeat() {
     if (!client.connected()) {
         return;
     }
     
-    // JSON reduzido para heartbeat
     String payload = "{";
     payload += "\"e\":\"HBT\",";
     payload += "\"ts\":" + String(millis()) + ",";

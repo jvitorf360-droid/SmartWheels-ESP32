@@ -33,10 +33,12 @@ void loopMQTT();
 void publicarMensagem(String topico, String payload);
 void publicarSeguro(String topico, String payload);
 void processarFilaMensagens();
-void enviarAlertaPanico(Localizacao loc);
-void enviarAlertaAcessibilidade(Localizacao loc);
 void enviarTelemetria();
 void enviarHeartbeat();
 bool mqttConectado();
+
+// NOVAS FUNÇÕES (com estado de ativação/desativação)
+void enviarAlertaPanico(bool ativo);
+void enviarAlertaAcessibilidade(bool ativo);
 
 #endif
