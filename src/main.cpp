@@ -9,6 +9,7 @@
 #include "gps_handler.h"
 #include "button_handler.h"
 #include "wifi_manager.h"
+#include "lte_manager.h"
 #include "mqtt_manager.h"
 #include "web_server.h"
 
@@ -89,28 +90,51 @@ if (alertaAcessibilidadeAtivo) {
     // 6. Inicializa WiFi
     inicializarWiFi();
     
-    // 7. Tenta conectar ao WiFi salvo
+    // 7. Conectividade principal
+    bool conectado = false;
+
+    // Primeiro tenta WiFi
     if (wifi_ssid != "") {
+
         LOG_INFO("Tentando conectar ao WiFi salvo...");
-        if (conectarWiFiSalvo()) {
+
+        conectado = conectarWiFiSalvo();
+
+        if (conectado) {
             LOG_INFO("WiFi conectado com sucesso!");
-            
-            // 8. Inicializa MQTT (só se tiver WiFi)
-            inicializarMQTT();
-            conectarMQTT();
-            
-            // 8.1 Limpa a fila de mensagens antigas
-            while (!filaMensagens.empty()) {
-                filaMensagens.pop();
-            }
-            LOG_INFO("Fila de mensagens limpa");
-            
-        } else {
-            LOG_ERROR("Falha ao conectar WiFi - iniciando modo AP");
-            iniciarModoAP();
         }
+    }
+
+    // Se WiFi falhou tenta LTE
+    if (!conectado) {
+
+        LOG_INFO("WiFi indisponível. Tentando LTE...");
+
+        if (inicializarLTE()) {
+
+            conectado = conectarLTE();
+
+            if (conectado) {
+                LOG_INFO("LTE conectado com sucesso!");
+            }
+        }
+    }
+
+    // Inicializa MQTT caso alguma rede esteja disponível
+    if (conectado) {
+
+        inicializarMQTT();
+        conectarMQTT();
+
+        while (!filaMensagens.empty()) {
+            filaMensagens.pop();
+        }
+
+        LOG_INFO("Fila de mensagens limpa");
+
     } else {
-        LOG_INFO("Nenhuma credencial WiFi salva - iniciando modo AP");
+
+        LOG_ERROR("Nenhuma conexão disponível");
         iniciarModoAP();
     }
     
@@ -146,7 +170,7 @@ void loop() {
     verificarConexaoWiFi();
     
     // 7. Se WiFi estiver conectado, gerencia MQTT
-    if (WiFi.status() == WL_CONNECTED) {
+    if (WiFi.status() == WL_CONNECTED || lteConectado()) {
         loopMQTT();
         processarFilaMensagens();
     }
@@ -194,7 +218,7 @@ void enviarDadosPeriodicos() {
     if (agora - ultimaTelemetria >= INTERVALO_TELEMETRIA) {
         ultimaTelemetria = agora;
         
-        if (WiFi.status() == WL_CONNECTED && client.connected()) {
+       if (mqttConectado()) {
             enviarTelemetria();
         }
     }
@@ -203,16 +227,16 @@ void enviarDadosPeriodicos() {
     if (agora - ultimoHeartbeat >= 30000) {
         ultimoHeartbeat = agora;
         
-        if (WiFi.status() == WL_CONNECTED && client.connected()) {
+        if (mqttConectado()) {
             enviarHeartbeat();
         }
         
         // Log periódico de status (apenas em DEBUG)
         if (logLevel == LOG_LEVEL_DEBUG) {
-            LOG_DEBUG("Status: WiFi=" + String(WiFi.status() == WL_CONNECTED ? "OK" : "FALHA") +
-                      " | MQTT=" + String(client.connected() ? "OK" : "FALHA") +
-                      " | GPS=" + String(gpsTemSinal() ? "SIM" : "NAO") +
-                      " | Sat=" + String(getNumeroSatelites()));
+            Serial.println("Status: WiFi=" + String(WiFi.status() == WL_CONNECTED ? "OK" : "FALHA") +
+                           " | MQTT=" + String(mqttConectado() ? "OK" : "FALHA") +
+                           " | GPS=" + String(gpsTemSinal() ? "SIM" : "NAO") +
+                           " | Sat=" + String(getNumeroSatelites()));
         }
     }
     

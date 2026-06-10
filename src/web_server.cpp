@@ -163,7 +163,7 @@ status += "  Acessibilidade (GPIO 13): " + String(digitalRead(13) == LOW ? "PRES
     status += "🌐 MQTT / THINGSBOARD\n";
     status += "  Servidor: " + mqtt_server + ":" + mqtt_port + "\n";
     status += "  Alerta panico ativo: " + String(alertaPanicoAtivo ? "SIM" : "NÃO") + "\n\n";
-    status += "  Conexão: " + String(client.connected() ? "CONECTADO" : "DESCONECTADO") + "\n";
+    status += "  Conexão: " + String(mqttConectado() ? "CONECTADO" : "DESCONECTADO") + "\n";
     status += "  Fila mensagens: " + String(filaMensagens.size()) + " pendentes\n\n";
     
     // Status GPS

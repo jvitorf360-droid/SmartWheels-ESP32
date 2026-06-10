@@ -21,8 +21,11 @@ struct MensagemPendente {
 };
 
 // ========== VARIÁVEIS GLOBAIS ==========
-extern WiFiClient espClient;
-extern PubSubClient client;
+extern WiFiClient wifiClient;
+extern PubSubClient mqttWifi;
+extern PubSubClient mqttLTE;
+extern PubSubClient* clientAtivo;
+
 extern std::queue<MensagemPendente> filaMensagens;
 
 // ========== FUNÇÕES PÚBLICAS ==========

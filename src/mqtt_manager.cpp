@@ -2,21 +2,31 @@
 // Implementação do gerenciamento MQTT
 
 #define MQTT_MAX_PACKET_SIZE 512
+#define TINY_GSM_MODEM_SIM7600
+#include <TinyGsmClient.h>
 
 #include "mqtt_manager.h"
 #include "logger.h"
 #include "wifi_manager.h"
+#include "lte_manager.h"
 #include <queue>
 
 // ========== VARIÁVEIS GLOBAIS PARA DIAGNÓSTICO ==========
 extern int contadorReinicios;
 extern int contadorFalhasMQTT;
 
+
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 // ========== DEFINIÇÃO DAS VARIÁVEIS GLOBAIS ==========
-WiFiClient espClient;
-PubSubClient client(espClient);
+WiFiClient wifiClient;
+TinyGsmClient gsmClient(modem);
+
+PubSubClient mqttWifi(wifiClient);
+PubSubClient mqttLTE(gsmClient);
+bool usandoLTE = false;
+
+PubSubClient* clientAtivo = nullptr;
 
 // Fila de mensagens pendentes
 std::queue<MensagemPendente> filaMensagens;
@@ -69,12 +79,30 @@ static void callbackMensagem(char* topic, byte* payload, unsigned int length) {
 
 // ========== IMPLEMENTAÇÃO DAS FUNÇÕES PÚBLICAS ==========
 
-void inicializarMQTT() {
-    client.setServer(mqtt_server.c_str(), mqtt_port.toInt());
-    client.setCallback(callbackMensagem);
-    LOG_INFO("MQTT inicializado");
-    LOG_INFO("  Servidor: " + mqtt_server + ":" + mqtt_port);
-}
+    void inicializarMQTT() {
+
+        if (lteConectado()) {
+
+            clientAtivo = &mqttLTE;
+            usandoLTE = true;
+
+        } else {
+
+            clientAtivo = &mqttWifi;
+            usandoLTE = false;
+        }
+
+        clientAtivo->setServer(
+            mqtt_server.c_str(),
+            mqtt_port.toInt()
+        );
+
+        clientAtivo->setCallback(
+            callbackMensagem
+        );
+
+        LOG_INFO("MQTT inicializado");
+    }
 
 bool conectarMQTT() {
     if (mqtt_token == "") {
@@ -82,7 +110,10 @@ bool conectarMQTT() {
         return false;
     }
     
-    if (WiFi.status() != WL_CONNECTED) {
+    if (
+    WiFi.status() != WL_CONNECTED &&
+    !lteConectado()
+) {
         LOG_ERROR("WiFi não conectado - não é possível conectar MQTT");
         return false;
     }
@@ -92,30 +123,33 @@ bool conectarMQTT() {
     // Gera um clientId único baseado no MAC address
     String clientId = "ESP32_SmartWheels_" + getMacAddress();
     
-    if (client.connect(clientId.c_str(), mqtt_token.c_str(), "")) {
+    if (clientAtivo->connect(clientId.c_str(), mqtt_token.c_str(), "")) {
         LOG_INFO("✅ Conectado ao ThingsBoard via MQTT!");
         tentativasReconexaoMQTT = 0;
         
         // Inscreve em tópicos para receber comandos
-        client.subscribe("v1/devices/me/rpc/request/+");
+        clientAtivo->subscribe("v1/devices/me/rpc/request/+");
         LOG_DEBUG("Inscrito em tópicos RPC");
         
         return true;
     } else {
-        LOG_ERROR("❌ Falha na conexão MQTT. Estado: " + String(client.state()));
+        LOG_ERROR("❌ Falha na conexão MQTT. Estado: " + String(clientAtivo->state()));
         return false;
     }
 }
 
 void desconectarMQTT() {
-    if (client.connected()) {
-        client.disconnect();
+    if (clientAtivo->connected()) {
+        clientAtivo->disconnect();
         LOG_INFO("MQTT desconectado");
     }
 }
 
 void loopMQTT() {
-    if (!client.connected()) {
+    if (
+    !clientAtivo ||
+    !clientAtivo->connected()
+    ) {
         // Tenta reconectar a cada 10 segundos
         unsigned long agora = millis();
         if (agora - ultimaTentativaMQTT > 10000) {
@@ -125,13 +159,13 @@ void loopMQTT() {
             conectarMQTT();
         }
     } else {
-        client.loop();
+        clientAtivo->loop();
     }
 }
 
 void publicarMensagem(String topico, String payload) {
-    if (client.connected()) {
-        if (client.publish(topico.c_str(), payload.c_str())) {
+    if (clientAtivo->connected()) {
+        if (clientAtivo->publish(topico.c_str(), payload.c_str())) {
             LOG_DEBUG("Mensagem publicada com sucesso no tópico: " + topico);
             return;
         } else {
@@ -143,8 +177,8 @@ void publicarMensagem(String topico, String payload) {
 }
 
 void publicarSeguro(String topico, String payload) {
-    if (client.connected()) {
-        if (client.publish(topico.c_str(), payload.c_str())) {
+    if (clientAtivo->connected()) {
+        if (clientAtivo->publish(topico.c_str(), payload.c_str())) {
             LOG_DEBUG("Mensagem publicada com sucesso");
             return;
         } else {
@@ -163,17 +197,17 @@ void publicarSeguro(String topico, String payload) {
 }
 
 void processarFilaMensagens() {
-    if (!client.connected()) {
+    if (!clientAtivo->connected()) {
         return;
     }
     
     int enviadas = 0;
     int falhas = 0;
     
-    while (!filaMensagens.empty() && client.connected() && enviadas < 10) {
+    while (!filaMensagens.empty() && clientAtivo->connected() && enviadas < 10) {
         MensagemPendente msg = filaMensagens.front();
         
-        if (client.publish(msg.topico.c_str(), msg.payload.c_str())) {
+        if (clientAtivo->publish(msg.topico.c_str(), msg.payload.c_str())) {
             filaMensagens.pop();
             enviadas++;
         } else {
@@ -226,7 +260,7 @@ void enviarAlertaPanico(Localizacao loc) {
     LOG_INFO("Payload: " + payload);
     LOG_INFO("Tamanho: " + String(payload.length()) + " bytes");
     
-    if (client.publish(TOPICO_TELEMETRIA, payload.c_str())) {
+    if (clientAtivo->publish(TOPICO_TELEMETRIA, payload.c_str())) {
         LOG_INFO("✅ Alerta de PÂNICO enviado com sucesso!");
     } else {
         LOG_ERROR("❌ Falha no envio do alerta");
@@ -264,7 +298,7 @@ void enviarAlertaAcessibilidade(Localizacao loc) {
     LOG_INFO("Payload: " + payload);
     LOG_INFO("Tamanho: " + String(payload.length()) + " bytes");
     
-    if (client.publish(TOPICO_TELEMETRIA, payload.c_str())) {
+    if (clientAtivo->publish(TOPICO_TELEMETRIA, payload.c_str())) {
         LOG_INFO("✅ Alerta de ACESSIBILIDADE enviado com sucesso!");
     } else {
         LOG_ERROR("❌ Falha no envio do alerta");
@@ -272,7 +306,7 @@ void enviarAlertaAcessibilidade(Localizacao loc) {
 }
 
 void enviarTelemetria() {
-    if (!client.connected()) {
+    if (!clientAtivo->connected()) {
         incrementarContadorFalhas();
         return;
     }
@@ -289,7 +323,7 @@ void enviarTelemetria() {
     payload += "\"falhas\":" + String(contadorFalhasMQTT);
     payload += "}";
     
-    if (client.publish(TOPICO_TELEMETRIA, payload.c_str())) {
+    if (clientAtivo->publish(TOPICO_TELEMETRIA, payload.c_str())) {
         LOG_DEBUG("Telemetria enviada");
     } else {
         LOG_ERROR("Falha ao enviar telemetria");
@@ -297,7 +331,7 @@ void enviarTelemetria() {
     }
 }
 void enviarHeartbeat() {
-    if (!client.connected()) {
+    if (!clientAtivo->connected()) {
         return;
     }
     
@@ -309,7 +343,7 @@ void enviarHeartbeat() {
     payload += "\"fw\":\"" + String(VERSAO_FIRMWARE) + "\"";
     payload += "}";
     
-    if (client.publish(TOPICO_TELEMETRIA, payload.c_str())) {
+    if (clientAtivo->publish(TOPICO_TELEMETRIA, payload.c_str())) {
         LOG_DEBUG("Heartbeat enviado");
     } else {
         LOG_ERROR("Falha ao enviar heartbeat");
@@ -317,5 +351,5 @@ void enviarHeartbeat() {
 }
 
 bool mqttConectado() {
-    return client.connected();
+    return clientAtivo->connected();
 }

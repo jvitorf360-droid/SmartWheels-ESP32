@@ -22,6 +22,19 @@
 #define WIFI_AP_PASSWORD     "config123"
 #define MAX_TENTATIVAS_WIFI  20
 
+// =========================
+// CONFIGURAÇÃO LTE SIM7600
+// =========================
+
+#define LTE_RX_PIN 16
+#define LTE_TX_PIN 17
+
+#define LTE_BAUD 115200
+
+#define LTE_APN "zap.vivo.com.br"
+#define LTE_USER ""
+#define LTE_PASS ""
+
 // ========== MQTT / THINGSBOARD ==========
 #define MQTT_SERVER_PADRAO   "iotnode01.memind.com.br"
 #define MQTT_PORTA_PADRAO    "1883"
