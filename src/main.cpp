@@ -32,6 +32,7 @@ void enviarDadosPeriodicos();
 
 // ========== SETUP ==========
 void setup() {
+
     // Inicializa serial para debug
     Serial.begin(115200);
     esp_task_wdt_init(10, true);
@@ -155,6 +156,9 @@ void loop() {
     
     // 8. Envia dados periódicos
     enviarDadosPeriodicos();
+
+    // 9. Verifica se houve reset combinado (pânico + acessibilidade)
+    verificarResetCombinado();
     
     // Pequeno delay para não sobrecarregar o processador
     delay(10);

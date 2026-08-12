@@ -129,3 +129,39 @@ TipoEvento verificarEvento() {
     }
     return EVENTO_NENHUM;
 }
+
+void verificarResetCombinado() {
+    static unsigned long inicioReset = 0;
+    static bool resetIniciado = false;
+    static bool msgExibida = false;
+
+    bool panicoPress = digitalRead(BOTAO_PANICO_PIN) == LOW;
+    bool acessibilidadePress = digitalRead(BOTAO_AMARELO_PIN) == LOW;
+
+    if (panicoPress && acessibilidadePress) {
+        if (!resetIniciado) {
+            resetIniciado = true;
+            inicioReset = millis();
+            msgExibida = false;
+        }
+
+        if (!msgExibida) {
+            Serial.println("⚠️ Reset de fábrica iniciado... segure os dois botões por 10 segundos.");
+            msgExibida = true;
+        }
+
+        if (millis() - inicioReset > 10000) {
+            Serial.println("🔄 Reset de fábrica confirmado! Limpando EEPROM...");
+            for (int i = 0; i < EEPROM_SIZE; i++) {
+                EEPROM.write(i, 0);
+            }
+            EEPROM.commit();
+            Serial.println("✅ EEPROM limpa. Reiniciando...");
+            delay(2000);
+            ESP.restart();
+        }
+    } else {
+        resetIniciado = false;
+        msgExibida = false;
+    }
+}

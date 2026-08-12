@@ -33,6 +33,7 @@ void processarBotoes();
 bool botaoPanicoFoiAcionado();
 bool botaoAcessibilidadeFoiAcionado();
 void resetarAlertas();
+void verificarResetCombinado();
 TipoEvento verificarEvento();
 
 #endif
