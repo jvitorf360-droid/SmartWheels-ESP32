@@ -1,10 +1,11 @@
+markdown
 # SmartWheels
 
 ## Sobre o Projeto
 
 O **SmartWheels** é um sistema de alerta desenvolvido para cadeiras de rodas, com o objetivo de oferecer mais segurança e autonomia para pessoas com mobilidade reduzida. 
 
-Através de um dispositivo ESP32 acoplado à cadeira, o usuário pode acionar um botão de pânico em situações de emergência. O dispositivo captura a localização em tempo real (via GPS) e envia os dados para a plataforma ThingsBoard, permitindo que um responsável seja notificado imediatamente (por exemplo, via WhatsApp, através de integrações futuras).
+Através de um dispositivo ESP32 acoplado à cadeira, o usuário pode acionar um botão de pânico em situações de emergência. O dispositivo captura a localização em tempo real (via GPS) e envia os dados para a plataforma ThingsBoard, permitindo que um responsável seja notificado imediatamente via WhatsApp, com integração já validada ao backend.
 
 O projeto nasceu da necessidade de criar uma camada extra de proteção para pessoas que enfrentam desafios diários de deslocamento, oferecendo mais tranquilidade tanto para o usuário quanto para seus familiares ou cuidadores.
 
@@ -15,7 +16,7 @@ O projeto nasceu da necessidade de criar uma camada extra de proteção para pes
 | ESP32 | DOIT DevKit V1 | — |
 | Módulo GPS | Comunicação serial | RX = 16, TX = 17 |
 | Botão de Pânico | Push button | GPIO 15 |
-| Botão de Acessibilidade | Push button | GPIO 13 (implementação futura) |
+| Botão de Acessibilidade | Push button | GPIO 18 |
 
 ## Bibliotecas Utilizadas
 
@@ -33,6 +34,8 @@ Leitura de GPS com simulação (fallback) em ambientes sem sinal
 
 Botão de pânico com detecção de pressão longa (3 segundos)
 
+Botão de acessibilidade com desacionamento automático após o envio do alerta
+
 Envio de alertas para o ThingsBoard via MQTT
 
 Payloads compactos (otimizados para economia de bytes)
@@ -46,6 +49,8 @@ Interface web embarcada para configuração de WiFi e token
 Reconexão automática WiFi e MQTT
 
 Watchdog para reinicialização segura em caso de travamento
+
+Reset combinado: pânico + acessibilidade pressionados juntos por 10 segundos limpa as configurações
 
 Como Configurar o Dispositivo
 1. Primeira inicialização (modo AP)
@@ -75,6 +80,17 @@ Após salvar, o dispositivo reinicia e tenta se conectar à rede informada.
 3. Verificação de status
 Acesse a rota /status do dispositivo (ex: http://192.168.0.100/status) para obter um diagnóstico completo.
 
+4. Reset de fábrica (limpar configurações)
+Caso precise apagar todas as configurações salvas (Wi-Fi, token, etc.):
+
+Pressione os dois botões ao mesmo tempo (pânico + acessibilidade)
+
+Mantenha pressionados por 10 segundos
+
+O dispositivo irá limpar a EEPROM e reiniciar automaticamente
+
+Após reiniciar, ele voltará ao modo de configuração (SmartWheels_Config)
+
 Estrutura do Código
 Arquivo	Função
 main.cpp	Integração de todos os módulos
@@ -98,6 +114,10 @@ MQTT não conecta	Verifique o token e o servidor MQTT
 GPS sem sinal	O sistema entra automaticamente em modo de simulação
 Página web não acessível	Confirme o IP correto no Serial Monitor
 Mensagens MQTT falham	O buffer MQTT foi ajustado para 512 bytes (suporta payloads maiores)
+Dispositivo com muitas redes Wi-Fi salvas	Pressione os dois botões (pânico + acessibilidade) por 10 segundos para resetar
+Versionamento
+Versão	Data	Alterações
+1.4	2026	Botão amarelo com desacionamento automático; reset combinado
 Autor
 João Vitor de Oliveira Francisco — Desenvolvimento do firmware ESP32
 

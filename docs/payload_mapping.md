@@ -1,3 +1,4 @@
+markdown
 # Mapeamento de Payloads MQTT - SmartWheels ESP32
 
 ## Tópico MQTT
@@ -7,69 +8,58 @@
 
 | Campo | Tipo | Significado | Valores Possíveis |
 |-------|------|-------------|-------------------|
-| `e` | string | Tipo do evento | `PAN` (pânico), `ACC` (acessibilidade), `TEL` (telemetria), `HBT` (heartbeat) |
-| `v` | string | Versão do payload | `1.0` |
-| `ts` | number | Timestamp (millis do ESP32) | 0 a 4294967295 |
-| `id` | string | MAC address do dispositivo | Ex: `40:91:51:2A:0D:98` |
-| `fw` | string | Versão do firmware | `1.3.0` |
-| `lat` | float | Latitude | Ex: `-23.550528` |
-| `lng` | float | Longitude | Ex: `-46.633312` |
-| `prec` | number | Precisão (metros) | `3` a `50` |
-| `src` | string | Fonte da localização | `GPS`, `SIMULADO`, `FALLBACK` |
-| `sat` | number | Número de satélites | `0` a `12` |
-| `rssi` | number | Sinal WiFi (dBm) | Ex: `-67`, `44` |
-| `bat` | number | Bateria (%) | `0` a `100` |
-| `up` | number | Uptime (segundos) | millis() / 1000 |
-| `gps` | number | GPS válido? | `1` (sim), `0` (não) |
-| `reinicios` | number | Reinicializações | Contador salvo na EEPROM |
-| `falhas` | number | Falhas MQTT | Contador salvo na EEPROM |
+| `botao_acionado` | string | Botão que foi acionado | `panico` ou `acessibilidade` |
+| `estado_acionamento` | number | Estado do alerta | `1` (ativado) ou `0` (desativado) |
+| `latitude` | float | Latitude da localização | Ex: `-23.550520` |
+| `longitude` | float | Longitude da localização | Ex: `-46.633308` |
+| `token` | string | Token de autenticação do dispositivo no ThingsBoard | Token gerado no ThingsBoard |
 
 ## Exemplos de Payloads
 
-### Alerta de Pânico (`e = PAN`)
-### Alerta de Acessibilidade (`e = ACC`)
-### Telemetria com Diagnóstico (`e = TEL`)
-### Heartbeat (`e = HBT`)
+### Alerta de Pânico (`botao_acionado = panico`)
+
+**Ativação:**
 ```json
 {
-  "e": "PAN",
-  "v": "1.0",
-  "ts": 28604,
-  "id": "40:91:51:2A:0D:98",
-  "lat": -23.550528,
-  "lng": -46.633312,
-  "prec": 50,
-  "src": "SIMULADO",
-  "sat": 0,
-  "rssi": 44,
-  "bat": 85
+  "botao_acionado": "panico",
+  "estado_acionamento": 1,
+  "latitude": -23.550520,
+  "longitude": -46.633308,
+  "token": "S2iLdye5coNPOJJQThKi"
 }
+Desativação:
+
+json
 {
-  "e": "ACC",
-  "v": "1.0",
-  "ts": 28604,
-  "id": "40:91:51:2A:0D:98",
-  "lat": -23.550528,
-  "lng": -46.633312,
-  "prec": 50,
-  "src": "SIMULADO",
-  "sat": 0,
-  "rssi": 44,
-  "bat": 85
+  "botao_acionado": "panico",
+  "estado_acionamento": 0,
+  "latitude": -23.550520,
+  "longitude": -46.633308,
+  "token": "S2iLdye5coNPOJJQThKi"
 }
+Alerta de Acessibilidade (botao_acionado = acessibilidade)
+Ativação (envio único):
+
+json
 {
-  "e": "TEL",
-  "ts": 28604,
-  "rssi": 44,
-  "gps": 0,
-  "sat": 0,
-  "up": 3600,
-  "reinicios": 3,
-  "falhas": 0
+  "botao_acionado": "acessibilidade",
+  "estado_acionamento": 1,
+  "latitude": -23.550520,
+  "longitude": -46.633308,
+  "token": "S2iLdye5coNPOJJQThKi"
 }
-{
-  "e": "HBT",
-  "ts": 28604,
-  "id": "40:91:51:2A:0D:98",
-  "fw": "1.3.0"
-}
+Observação: o alerta de acessibilidade é enviado uma única vez e se desativa automaticamente. Não há payload de desativação para este botão.
+
+Observações Importantes
+O payload foi simplificado para o formato enxuto, contendo apenas os campos essenciais para o backend.
+
+O campo token é o mesmo utilizado para autenticação no ThingsBoard.
+
+A localização pode ser proveniente de GPS real ou de simulação (fallback), mas no payload o formato é idêntico.
+
+O campo estado_acionamento indica se o alerta está sendo ativado (1) ou desativado (0).
+
+Versionamento
+Versão	Data	Alterações
+1.0	2026	Versão inicial com formato compacto (siglas)
+1.4	2026	Formato enxuto padronizado com campos descritivos
