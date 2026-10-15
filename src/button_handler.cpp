@@ -63,14 +63,23 @@ static void processarBotao(EstadoBotao &botao) {
         salvarEstadoPanico(alertaPanicoAtivo);
         
     } else if (botao.tipo == EVENTO_ACESSIBILIDADE) {
-        alertaAcessibilidadeAtivo = !alertaAcessibilidadeAtivo;
-        LOG_INFO(alertaAcessibilidadeAtivo ? "⚠️ ALERTA DE ACESSIBILIDADE ATIVADO!" : "✅ Alerta de acessibilidade desativado");
-        
-        enviarAlertaAcessibilidade(alertaAcessibilidadeAtivo);
-        
-        // Salva o estado na EEPROM
-        salvarEstadoAcessibilidade(alertaAcessibilidadeAtivo);
-    }
+    // Botão amarelo: ativa, envia o alerta e desativa automaticamente
+    alertaAcessibilidadeAtivo = true;
+    LOG_INFO("⚠️ ALERTA DE ACESSIBILIDADE ATIVADO!");
+    
+    // Envia payload com estado ativo
+    enviarAlertaAcessibilidade(true);
+    
+    // Salva o estado (opcional, mas mantém consistência)
+    salvarEstadoAcessibilidade(true);
+    
+    // Desativa automaticamente após um curto delay
+    delay(1000); // 1 segundo para garantir o envio
+    
+    alertaAcessibilidadeAtivo = false;
+    LOG_INFO("✅ Alerta de acessibilidade desativado automaticamente");
+    salvarEstadoAcessibilidade(false);
+}
 }
     }
 }
