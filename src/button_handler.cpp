@@ -78,6 +78,8 @@ static void processarBotao(EstadoBotao &botao) {
     
     alertaAcessibilidadeAtivo = false;
     LOG_INFO("✅ Alerta de acessibilidade desativado automaticamente");
+    enviarAlertaAcessibilidade(false);
+
     salvarEstadoAcessibilidade(false);
 }
 }
